@@ -1,0 +1,2 @@
+# RaspberryPi4_RS485_Communication
+RaspberryPi4のUARTを5つ使いRS485の並列通信を行う
