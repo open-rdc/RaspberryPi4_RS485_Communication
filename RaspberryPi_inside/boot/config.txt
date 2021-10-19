@@ -1,1 +1,8 @@
-aaa
+[all]
+dtoverlay=pi3-disable-bt
+enable_uart=1
+dtoverlay=uart2
+enable_uart=1
+dtoverlay=uart3,ctsrts
+dtoverlay=uart4
+dtoverlay=uart5
