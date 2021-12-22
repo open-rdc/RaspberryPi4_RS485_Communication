@@ -36,7 +36,8 @@
 #define B3M_SET_TIMEOUT 2000
 #define B3M_ID_TIMEOUT 2000
 
-#define B3M_BAUD B38400 // custom bitrate
+//#define B3M_BAUD B38400 // custom bitrate
+#define B3M_BAUD B1000000 // B3M bitrate
 
 // b3m commands
 #define B3M_CMD_LOAD					0x01

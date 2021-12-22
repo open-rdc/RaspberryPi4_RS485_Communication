@@ -2,7 +2,7 @@
 
 int main(){
 	B3MData b3m;
-	char *serial_port = "/dev/tty";
+	char *serial_port = "/dev/ttyAMA0";
 	if (b3m_init(&b3m, serial_port) < 0){
 		fprintf(stderr, "cannnot port open %s\r\n", serial_port);
 	}
