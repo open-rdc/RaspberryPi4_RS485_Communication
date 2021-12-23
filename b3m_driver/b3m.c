@@ -24,6 +24,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <linux/serial.h>
+#include <wiringPi.h>
 
 #include "b3m.h"
 
@@ -91,6 +92,10 @@ int b3m_init(B3MData * r, const char* serial_port)
 		exit(-1);
 	}
 	for(i = 0; i < 256; i ++) target_deg100[i] = 100000;
+
+	wiringPiSetup();
+	pinMode(1, OUTPUT);
+	digitalWrite(1, HIGH);
 
 	return 0;
 }
