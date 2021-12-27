@@ -44,7 +44,7 @@ int target_deg100[256];
  *
  * @return 0 if successful, < 0 otherwise
  */
-int b3m_init(B3MData * r, const char* serial_port)
+int b3m_init(B3MData * r, const char* serial_port, int switch_txrx_port)
 {
 	int i;
 	printf("b3m_init\n");
@@ -92,11 +92,9 @@ int b3m_init(B3MData * r, const char* serial_port)
 		exit(-1);
 	}
 	for(i = 0; i < 256; i ++) target_deg100[i] = 100000;
-
-	wiringPiSetup();
-	pinMode(1, OUTPUT);
-	digitalWrite(1, LOW);
-	piHiPri(99);
+	r->switch_txrx_port = switch_txrx_port;
+	pinMode(r->switch_txrx_port, OUTPUT);
+	digitalWrite(r->switch_txrx_port, LOW);
 
 	return 0;
 }
@@ -224,15 +222,15 @@ int b3m_trx_timeout(B3MData * r, UINT bytes_out, UINT bytes_in, long timeout)
 	if ((i = b3m_purge(r)) < 0)
 		return i;
 
-	digitalWrite(1, HIGH);
+	digitalWrite(r->switch_txrx_port, HIGH);
 	if ((i = b3m_write(r, bytes_out)) < 0) {
-		digitalWrite(1, LOW);
+		digitalWrite(r->switch_txrx_port, LOW);
 		return i;
 	}
 
 	if (bytes_out == 7) delayMicroseconds(70);
 	else delayMicroseconds(90);
-	digitalWrite(1, LOW);
+	digitalWrite(r->switch_txrx_port, LOW);
 
 	// debug printing
 	if (r->debug) {

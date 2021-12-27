@@ -188,10 +188,11 @@ typedef struct
 	UCHAR swap[128]; // swap space output
 	char error[128]; // error messages
 	UCHAR debug; // whether to print debug info
+	int switch_txrx_port;
 } B3MData;
 
 // low level comms
-int b3m_init(B3MData * r, const char* serial_port);
+int b3m_init(B3MData * r, const char* serial_port, int switch_txrx_port);
 int b3m_close(B3MData * r);
 int b3m_write(B3MData * r, int n);
 int b3m_read(B3MData * r, int n);
