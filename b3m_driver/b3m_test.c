@@ -1,4 +1,5 @@
 #include "b3m.h"
+#include <unistd.h>
 
 int main(){
 	B3MData b3m;
@@ -8,5 +9,17 @@ int main(){
 	}
 	b3m_servo_mode(&b3m, 0, B3M_OPTIONS_RUN_NORMAL);
 	b3m_set_angle(&b3m, 0, 0.0);
+	int no_error = 0;
+	for(int i = 0; i < 1000; i ++){
+		int deg100;
+		if (b3m_get_angle(&b3m, 0, &deg100) == 0) {
+			printf("%d\r\n", deg100);
+		} else {
+			printf("error\r\n");
+			no_error ++;
+		}
+		usleep(1000);
+	}
+	printf("error: %d\r\n", no_error);
 	b3m_close(&b3m);
 }
