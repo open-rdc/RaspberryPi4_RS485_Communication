@@ -96,6 +96,7 @@ int b3m_init(B3MData * r, const char* serial_port)
 	wiringPiSetup();
 	pinMode(1, OUTPUT);
 	digitalWrite(1, LOW);
+	piHiPri(99);
 
 	return 0;
 }
@@ -229,7 +230,8 @@ int b3m_trx_timeout(B3MData * r, UINT bytes_out, UINT bytes_in, long timeout)
 		return i;
 	}
 
-	usleep(0);
+	if (bytes_out == 7) delayMicroseconds(70);
+	else delayMicroseconds(90);
 	digitalWrite(1, LOW);
 
 	// debug printing
