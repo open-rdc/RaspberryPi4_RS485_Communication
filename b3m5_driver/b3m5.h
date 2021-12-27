@@ -181,6 +181,8 @@ typedef unsigned char UCHAR;
 typedef unsigned int UINT;
 #endif
 
+#define CHANNEL 5
+
 // instance data for kondo library
 typedef struct
 {
@@ -192,18 +194,18 @@ typedef struct
 } B3MData;
 
 // low level comms
-int b3m_init(B3MData * r, const char* serial_port, int switch_txrx_port);
-int b3m_close(B3MData * r);
-int b3m_write(B3MData * r, int n);
-int b3m_read_timeout(B3MData * r, int n, long timeout);
-int b3m_purge(B3MData * r);
-int b3m_trx_timeout(B3MData * r, UINT bytes_out, UINT bytes_in, long timeout);
+int b3m_init(B3MData r[CHANNEL], char serial_port[CHANNEL][20], int switch_txrx_port[CHANNEL]);
+int b3m_close(B3MData r[CHANNEL]);
+int b3m_write(B3MData r[CHANNEL], int n);
+int b3m_read_timeout(B3MData r[CHANNEL], int n, long timeout);
+int b3m_purge(B3MData r[CHANNEL]);
+int b3m_trx_timeout(B3MData r[CHANNEL], UINT bytes_out, UINT bytes_in, long timeout);
 
 // position commands
-int b3m_set_angle(B3MData * r, UINT id, int pos);
-int b3m_servo_mode(B3MData * r, UINT id, UCHAR option);
+int b3m_set_angle(B3MData r[CHANNEL], UINT id[CHANNEL], int pos[CHANNEL]);
+int b3m_servo_mode(B3MData r[CHANNEL], UINT id[CHANNEL], UCHAR option);
 
 // servo setting commands
-int b3m_get_angle(B3MData * r, UINT id, int *deg100);
+int b3m_get_angle(B3MData r[CHANNEL], UINT id[CHANNEL], int deg100[CHANNEL]);
 
 #endif /* B3M_H_ */

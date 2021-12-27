@@ -16,13 +16,22 @@ int main(){
 			fprintf(stderr, "cannnot port open %s\r\n", serial_port);
 		}
 	}
+	b3m_servo_mode(&b3m[channel[0]], 0, B3M_OPTIONS_RUN_NORMAL);
+	b3m_set_angle(&b3m[channel[0]], 0, 0.0);
 	b3m_servo_mode(&b3m[channel[id]], id, B3M_OPTIONS_RUN_NORMAL);
 	b3m_set_angle(&b3m[channel[id]], id, 0.0);
 	int no_error = 0;
 	for(int i = 0; i < 10000; i ++){
 		int deg100;
+		b3m_set_angle(&b3m[channel[0]], 0, i*1);
 		b3m_set_angle(&b3m[channel[id]], id, i*1);
 		usleep(0);
+		if (b3m_get_angle(&b3m[channel[0]], 0, &deg100) == 0) {
+			printf("%d	", deg100);
+		} else {
+			printf("error	");
+			no_error ++;
+		}
 		if (b3m_get_angle(&b3m[channel[id]], id, &deg100) == 0) {
 			printf("%d\r\n", deg100);
 		} else {

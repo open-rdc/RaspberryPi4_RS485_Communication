@@ -34,8 +34,8 @@ int target_deg100[256];
 
 // Convenience macros
 #define b3m_error(ki, err) { \
-  snprintf(ki->error, 128, "ERROR: %s: %s\n", __func__, err); \
-  fprintf(stderr,"%s\n", ki->error); \
+  snprintf(ki.error, 128, "ERROR: %s: %s\n", __func__, err); \
+  fprintf(stderr,"%s\n", ki.error); \
   return -1; }
 
 /*!
@@ -44,57 +44,56 @@ int target_deg100[256];
  *
  * @return 0 if successful, < 0 otherwise
  */
-int b3m_init(B3MData * r, const char* serial_port, int switch_txrx_port)
+int b3m_init(B3MData r[CHANNEL], char serial_port[CHANNEL][20], int switch_txrx_port[CHANNEL])
 {
-	int i;
 	printf("b3m_init\n");
-	assert(r);
-	r->debug = 0;
 
-	struct termios tio;
+	for(int i = 0; i < CHANNEL; i ++) {
+		struct termios tio;
 
-	r->fd = open(serial_port, O_RDWR | O_NOCTTY);
-	if (ioctl(r->fd, TCGETS, &tio)){
-		b3m_error(r, "Get serial port parameters");
+		r[i].fd = open(serial_port[i], O_RDWR | O_NOCTTY);
+		if (ioctl(r[i].fd, TCGETS, &tio)){
+			b3m_error(r[i], "Get serial port parameters");
+		}
+
+		tio.c_cflag &= ~CBAUD;          // clear mask for setting baud rate
+		tio.c_cflag &= ~PARENB;         // set no parity
+		tio.c_cflag &= ~CSTOPB;         // 1 stop bit
+		tio.c_cflag &= ~CSIZE;          // clear mask for setting the data size
+		tio.c_cflag |= B3M_BAUD;        // set B3M baud
+		tio.c_cflag |= CS8;             // character size 8 bit
+		tio.c_cflag |= CREAD;           // enable receiver
+		tio.c_cflag |= CLOCAL;          // ignore modem status line
+		tio.c_iflag = IGNBRK | IGNPAR;  // ignore break condition and characer with parity error
+		tio.c_oflag = 0;                // raw mode
+		tio.c_lflag = 0;                // noncanonical input
+		tio.c_cc[VMIN] = 0;             // 0 return all else until n byte received
+		tio.c_cc[VTIME] = 1;            // 0 block forever else until n tenth second
+		tcflush(r[i].fd, TCIOFLUSH);      // flush current port setting
+
+		if (ioctl(r[i].fd, TCSETS, &tio)){
+			b3m_error(r[i], "Set serial port parameters");
+		}
+
+		struct serial_struct sstruct;
+
+		if (ioctl(r[i].fd, TIOCGSERIAL, &sstruct) < 0) {
+			printf("Error: could not get comm ioctl\n");
+			exit(-1);
+		}
+
+		sstruct.custom_divisor = sstruct.baud_base / BAUDRATE;
+		sstruct.flags |= ASYNC_SPD_CUST;
+
+		if (ioctl(r[i].fd, TIOCSSERIAL, &sstruct) < 0) {
+			printf("Error: could not set custom comm baud divisor\n");
+			exit(-1);
+		}
+		r[i].switch_txrx_port = switch_txrx_port[i];
+		pinMode(r[i].switch_txrx_port, OUTPUT);
+		digitalWrite(r[i].switch_txrx_port, LOW);
 	}
-
-	tio.c_cflag &= ~CBAUD;          // clear mask for setting baud rate
-	tio.c_cflag &= ~PARENB;         // set no parity
-	tio.c_cflag &= ~CSTOPB;         // 1 stop bit
-	tio.c_cflag &= ~CSIZE;          // clear mask for setting the data size
-	tio.c_cflag |= B3M_BAUD;        // set B3M baud
-	tio.c_cflag |= CS8;             // character size 8 bit
-	tio.c_cflag |= CREAD;           // enable receiver
-	tio.c_cflag |= CLOCAL;          // ignore modem status line
-	tio.c_iflag = IGNBRK | IGNPAR;  // ignore break condition and characer with parity error
-	tio.c_oflag = 0;                // raw mode
-	tio.c_lflag = 0;                // noncanonical input
-	tio.c_cc[VMIN] = 0;             // 0 return all else until n byte received
-	tio.c_cc[VTIME] = 1;            // 0 block forever else until n tenth second
-	tcflush(r->fd, TCIOFLUSH);      // flush current port setting
-
-	if (ioctl(r->fd, TCSETS, &tio)){
-		b3m_error(r, "Set serial port parameters");
-	}
-
-	struct serial_struct sstruct;
-
-	if (ioctl(r->fd, TIOCGSERIAL, &sstruct) < 0) {
-		printf("Error: could not get comm ioctl\n");
-		exit(-1);
-	}
-
-	sstruct.custom_divisor = sstruct.baud_base / BAUDRATE;
-	sstruct.flags |= ASYNC_SPD_CUST;
-
-	if (ioctl(r->fd, TIOCSSERIAL, &sstruct) < 0) {
-		printf("Error: could not set custom comm baud divisor\n");
-		exit(-1);
-	}
-	for(i = 0; i < 256; i ++) target_deg100[i] = 100000;
-	r->switch_txrx_port = switch_txrx_port;
-	pinMode(r->switch_txrx_port, OUTPUT);
-	digitalWrite(r->switch_txrx_port, LOW);
+	for(int i = 0; i < 256; i ++) target_deg100[i] = 100000;
 
 	return 0;
 }
@@ -104,12 +103,11 @@ int b3m_init(B3MData * r, const char* serial_port, int switch_txrx_port)
  * 
  * @return 0 if successful, < 0 otherwise
  */
-int b3m_close(B3MData * r)
+int b3m_close(B3MData r[CHANNEL])
 {
 	printf("b3m_close\n");
-	assert(r);
 
-	close(r->fd);
+	for(int i = 0; i < CHANNEL; i ++) close(r[i].fd);
 
 	return 0;
 }
@@ -119,15 +117,15 @@ int b3m_close(B3MData * r)
  * 
  * @return >0 number of bytes written, < 0 if error
  */
-int b3m_write(B3MData * r, int n)
+int b3m_write(B3MData r[CHANNEL], int n)
 {
-	assert(r);
+	int ret = 0;
+	for(int i = 0; i < CHANNEL; i ++) {
+		if ((ret = write(r[i].fd, r[i].swap, n)) < 0)
+			b3m_error(r[i], "Send data");
+	}
 
-	int i;
-	if ((i = write(r->fd, r->swap, n)) < 0)
-		b3m_error(r, "Send data");
-
-	return i;
+	return ret;
 }
 
 
@@ -138,12 +136,9 @@ int b3m_write(B3MData * r, int n)
  *
  * @return < 0: error, >= 0: number of bytes read
  */
-int b3m_read_timeout(B3MData * r, int n, long usecs)
+int b3m_read_timeout(B3MData r[CHANNEL], int n, long usecs)
 {
-	assert(r);
-
 	static struct timeval tv, end;
-	int i = 0, bytes_read = 0;
 	gettimeofday(&tv, NULL);
 
 	// determine end time
@@ -154,16 +149,20 @@ int b3m_read_timeout(B3MData * r, int n, long usecs)
 		end.tv_usec -= 1000000;
 	}
 	// spam the read until data arrives
-	do {
-	    if ((i = read(r->fd, &(r->swap[bytes_read]), n - bytes_read)) < 0) {
-			b3m_error(r, "Read data");
-	    }
-	    bytes_read += i;
-	    gettimeofday(&tv, NULL);
-	    if (bytes_read > 0) {
-			if (r->swap[0] != n) break;
-	    }
-	} while (bytes_read < n && (tv.tv_sec < end.tv_sec || (tv.tv_sec == end.tv_sec && tv.tv_usec < end.tv_usec)));
+	int i, bytes_read;
+	for(int j = 0; j < CHANNEL; j ++) {
+		i = 0, bytes_read = 0;
+		do {
+		    if ((i = read(r[j].fd, &(r[j].swap[bytes_read]), n - bytes_read)) < 0) {
+				b3m_error(r[j], "Read data");
+		    }
+		    bytes_read += i;
+		    gettimeofday(&tv, NULL);
+		    if (bytes_read > 0) {
+				if (r[j].swap[0] != n) break;
+		    }
+		} while (bytes_read < n && (tv.tv_sec < end.tv_sec || (tv.tv_sec == end.tv_sec && tv.tv_usec < end.tv_usec)));
+	}
 	return bytes_read;
 }
 
@@ -172,10 +171,9 @@ int b3m_read_timeout(B3MData * r, int n, long usecs)
  *
  * @return 0 if successful, < 0 if error
  */
-int b3m_purge(B3MData * r)
+int b3m_purge(B3MData r[CHANNEL])
 {
-	assert(r);
-	tcflush(r->fd, TCIOFLUSH);
+	for(int i = 0; i< CHANNEL; i ++) tcflush(r[i].fd, TCIOFLUSH);
 
 	return 0;
 }
@@ -187,45 +185,60 @@ int b3m_purge(B3MData * r)
  *
  * @return < 0: error, >= 0: number of bytes read
  */
-int b3m_trx_timeout(B3MData * r, UINT bytes_out, UINT bytes_in, long timeout)
+int b3m_trx_timeout(B3MData r[CHANNEL], UINT bytes_out, UINT bytes_in, long timeout)
 {
-	assert(r);
 	int i, j;
 
 	if ((i = b3m_purge(r)) < 0)
 		return i;
-
-	digitalWrite(r->switch_txrx_port, HIGH);
+	for(int k = 0; k < CHANNEL; k ++) {
+		digitalWrite(r[k].switch_txrx_port, HIGH);
+	}
 	if ((i = b3m_write(r, bytes_out)) < 0) {
-		digitalWrite(r->switch_txrx_port, LOW);
+		for(int k = 0; k < CHANNEL; k ++) digitalWrite(r[k].switch_txrx_port, LOW);
 		return i;
 	}
 
-	if (bytes_out == 7) delayMicroseconds(70);
-	else delayMicroseconds(90);
-	digitalWrite(r->switch_txrx_port, LOW);
-
-	// debug printing
-	if (r->debug) {
-		printf("send %d bytes: ", bytes_out);
-		for (j = 0; j < bytes_out; j++)
-			printf("%x ", r->swap[j]);
-		printf("\n");
+	if (bytes_out == 7) {
+		delayMicroseconds(55);
+		for(int k = 0; k < CHANNEL; k ++) {
+			digitalWrite(r[k].switch_txrx_port, LOW);
+			delayMicroseconds(5);
+		}
 	}
+	else {
+		delayMicroseconds(70);
+		for(int k = 0; k < CHANNEL; k ++) {
+			digitalWrite(r[k].switch_txrx_port, LOW);
+			delayMicroseconds(5);
+		}
+	}
+	
+	for(int k = 0; k < CHANNEL; k ++) {
+		// debug printing
+		if (0) {
+			printf("send %d bytes: ", bytes_out);
+			for (j = 0; j < bytes_out; j++)
+				printf("%x ", r[k].swap[j]);
+			printf("\n");
+		}
 
-	// clear swap
-	for (i = 0; i < bytes_in; i++)
-		r->swap[i] = 0;
+		// clear swap
+		for (i = 0; i < bytes_in; i++)
+			r[k].swap[i] = 0;
+	}
 
 	// read the return data
 	i = b3m_read_timeout(r, bytes_in, timeout);
 
-	// debug printing
-	if (r->debug) {
-		printf("recv %d bytes: ", i);
-		for (j = 0; j < i; j++)
-			printf("%x ", r->swap[j]);
-		printf("\n");
+	for(int k = 0; k < CHANNEL; k ++) {
+		// debug printing
+		if (0) {
+			printf("recv %d bytes: ", i);
+			for (j = 0; j < i; j++)
+				printf("%x ", r->swap[j]);
+			printf("\n");
+		}
 	}
 
 	return i;
@@ -241,34 +254,35 @@ int b3m_trx_timeout(B3MData * r, UINT bytes_out, UINT bytes_in, long timeout)
  * @param[in] byte byte of data
  * @return error status
  */
-int b3m_com_send(B3MData * r, UINT id, UINT address, UCHAR *data, int byte)
+int b3m_com_send(B3MData r[CHANNEL], UINT id[CHANNEL], UINT address, UCHAR data[CHANNEL][2], int byte)
 {
-	assert(r);
+	for(int k = 0; k < CHANNEL; k ++) {
+		int i, n = 0;
+		int sum = 0, time = 0;
 
-	int i, n = 0;
-	int sum = 0, time = 0;
-
-	// build command
-	r->swap[n++] = 7 + byte;				// length
-	r->swap[n++] = B3M_CMD_WRITE;			// command
-	r->swap[n++] = B3M_RETURN_ERROR_STATUS;	// option
-	r->swap[n++] = id;						// id
-	for(i = 0; i < byte; i ++){
-		r->swap[n++] = data[i];
+		// build command
+		r[k].swap[n++] = 7 + byte;				// length
+		r[k].swap[n++] = B3M_CMD_WRITE;			// command
+		r[k].swap[n++] = B3M_RETURN_ERROR_STATUS;	// option
+		r[k].swap[n++] = id[k];						// id
+		for(i = 0; i < byte; i ++){
+			r[k].swap[n++] = data[k][i];
+		}
+		r[k].swap[n++] = address;
+		r[k].swap[n++] = 0x01;					// number of ID
+		for(i = 0; i < n; i ++){
+			sum += r[k].swap[i];
+		}
+		r[k].swap[n] = sum & 0xff;
 	}
-	r->swap[n++] = address;
-	r->swap[n++] = 0x01;					// number of ID
-	for(i = 0; i < n; i ++){
-		sum += r->swap[i];
-	}
-	r->swap[n] = sum & 0xff;
 
+	int i = 0;
 	// synchronize with servo
 	if ((i = b3m_trx_timeout(r, 7 + byte, 5, B3M_POS_TIMEOUT)) < 0)
 		return i;
 
 	// return error status
-	return r->swap[2];
+	return r[0].swap[2];
 }
 
 
@@ -281,33 +295,36 @@ int b3m_com_send(B3MData * r, UINT id, UINT address, UCHAR *data, int byte)
  * @param[in] byte byte of data
  * @return error status
  */
-int b3m_get_status(B3MData * r, UINT id, UINT address, UCHAR *data, int byte)
+int b3m_get_status(B3MData r[CHANNEL], UINT id[CHANNEL], UINT address, UCHAR data[CHANNEL][2], int byte)
 {
-	assert(r);
+	for(int k = 0; k < CHANNEL; k ++){
+		int i, n = 0;
+		int sum = 0, time = 0;
 
-	int i, n = 0;
-	int sum = 0, time = 0;
-
-	// build command
-	r->swap[n++] = 0x07;					// length
-	r->swap[n++] = B3M_CMD_READ;			// command
-	r->swap[n++] = B3M_RETURN_ERROR_STATUS;	// option
-	r->swap[n++] = id;						// id
-	r->swap[n++] = address;
-	r->swap[n++] = byte;					// number of ID
-	for(i = 0; i < n; i ++){
-		sum += r->swap[i];
+		// build command
+		r[k].swap[n++] = 0x07;					// length
+		r[k].swap[n++] = B3M_CMD_READ;			// command
+		r[k].swap[n++] = B3M_RETURN_ERROR_STATUS;	// option
+		r[k].swap[n++] = id[k];						// id
+		r[k].swap[n++] = address;
+		r[k].swap[n++] = byte;					// number of ID
+		for(i = 0; i < n; i ++){
+			sum += r[k].swap[i];
+		}
+		r[k].swap[n] = sum & 0xff;
 	}
-	r->swap[n] = sum & 0xff;
 
 	// synchronize with servo
+	int i = 0;
 	if ((i = b3m_trx_timeout(r, 7, 5 + byte, B3M_POS_TIMEOUT)) < 0){
 		return i;
 	}
 
-	if (r->swap[0] != 5 + byte) return -1;
-	for(i = 0; i < byte; i ++){
-		data[i] = r->swap[i + 4];
+	for(int k = 0; k < CHANNEL; k ++) {
+		if (r[k].swap[0] != 5 + byte) return -1;
+		for(int i = 0; i < byte; i ++){
+			data[k][i] = r[k].swap[i + 4];
+		}
 	}
 
 	// return error status
@@ -322,13 +339,13 @@ int b3m_get_status(B3MData * r, UINT id, UINT address, UCHAR *data, int byte)
  * @param[in] pos the position to set (angle * 100)
  * @return error status.
  */
-int b3m_set_angle(B3MData * r, UINT id, int deg100)
+int b3m_set_angle(B3MData r[CHANNEL], UINT id[CHANNEL], int deg100[CHANNEL])
 {
-	assert(r);
-
-	UCHAR data[2];
-	data[0] = deg100 & 0xff;
-	data[1] = deg100 >> 8;
+	UCHAR data[CHANNEL][2];
+	for(int i = 0; i < CHANNEL; i ++) {
+		data[i][0] = deg100[i] & 0xff;
+		data[i][1] = deg100[i] >> 8;
+	}
 
 	return b3m_com_send(r, id, B3M_SERVO_DESIRED_POSITION, data, 2);
 }
@@ -341,16 +358,16 @@ int b3m_set_angle(B3MData * r, UINT id, int deg100)
  * @param[out] deg100 the angle * 100
  * @return error status.
  */
-int b3m_get_angle(B3MData * r, UINT id, int *deg100)
+int b3m_get_angle(B3MData r[CHANNEL], UINT id[CHANNEL], int deg100[CHANNEL])
 {
-	assert(r);
-
-	UCHAR data[2];
+	UCHAR data[CHANNEL][2];
 	if (b3m_get_status(r, id, B3M_SERVO_CURRENT_POSITION, data, 2)){
 		return -1;
 	}
 
-	*deg100 = (int)((short)((data[1] << 8) + data[0]));
+	for(int i = 0; i < CHANNEL; i ++){
+		deg100[i] = (int)((short)((data[i][1] << 8) + data[i][0]));
+	}
 	return 0;
 }
 
@@ -362,13 +379,13 @@ int b3m_get_angle(B3MData * r, UINT id, int *deg100)
  * @param[in] option B3M_OPTIONS_*
  * @return error status
  */
-int b3m_servo_mode(B3MData * r, UINT id, UCHAR option)
+int b3m_servo_mode(B3MData r[CHANNEL], UINT id[CHANNEL], UCHAR option)
 {
-	assert(r);
-
-	UCHAR data[2];
-	data[0] = option;						// mode
-	data[1] = 0x00;							// interpolation
+	UCHAR data[CHANNEL][2];
+	for(int i = 0; i < CHANNEL; i ++) {
+		data[i][0] = option;						// mode
+		data[i][1] = 0x00;							// interpolation
+	}
 
 	return b3m_com_send(r, id, B3M_SERVO_SERVO_MODE, data, 2);
 }
