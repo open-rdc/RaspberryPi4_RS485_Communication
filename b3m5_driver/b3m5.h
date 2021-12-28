@@ -181,6 +181,8 @@ typedef unsigned char UCHAR;
 typedef unsigned int UINT;
 #endif
 
+#define CHANNEL 5
+
 // instance data for kondo library
 typedef struct
 {
@@ -192,36 +194,18 @@ typedef struct
 } B3MData;
 
 // low level comms
-int b3m_init(B3MData * r, const char* serial_port, int switch_txrx_port);
-int b3m_close(B3MData * r);
-int b3m_write(B3MData * r, int n);
-int b3m_read(B3MData * r, int n);
-int b3m_read_timeout(B3MData * r, int n, long timeout);
-int b3m_purge(B3MData * r);
-int b3m_trx(B3MData * r, UINT bytes_out, UINT bytes_in);
-int b3m_trx_timeout(B3MData * r, UINT bytes_out, UINT bytes_in, long timeout);
+int b3m_init(B3MData r[CHANNEL], char serial_port[CHANNEL][20], int switch_txrx_port[CHANNEL]);
+int b3m_close(B3MData r[CHANNEL]);
+int b3m_write(B3MData r[CHANNEL], int n);
+int b3m_read_timeout(B3MData r[CHANNEL], int n, long timeout);
+int b3m_purge(B3MData r[CHANNEL]);
+int b3m_trx_timeout(B3MData r[CHANNEL], UINT bytes_out, UINT bytes_in, long timeout);
 
 // position commands
-int b3m_set_angle(B3MData * r, UINT id, int pos);
-int b3m_set_trajectory_mode(B3MData * r, UINT id, int trajectory_mode);
-int b3m_set_angle_period(B3MData * r, UINT id, int *deg100, int period_ms);
-int b3m_set_angle_velocity(B3MData * r, UINT id, int *deg100, int velocity_deg100);
-int b3m_servo_mode(B3MData * r, UINT id, UCHAR option);
+int b3m_set_angle(B3MData r[CHANNEL], UINT id[CHANNEL], int pos[CHANNEL]);
+int b3m_servo_mode(B3MData r[CHANNEL], UINT id[CHANNEL], UCHAR option);
 
 // servo setting commands
-int b3m_get_angle(B3MData * r, UINT id, int *deg100);
-int b3m_get_velocity(B3MData * r, UINT id, int *deg100);
-int b3m_get_pwm_duty_ratio(B3MData * r, UINT id, int *duty_ratio);
-
-int b3m_get_stretch(B3MData * r, UINT id);
-int b3m_get_current(B3MData * r, UINT id, int *current_mA);
-int b3m_set_stretch(B3MData * r, UINT id, UCHAR stretch);
-int b3m_set_speed(B3MData * r, UINT id, int speed);
-int b3m_set_current_limit(B3MData * r, UINT id, int curlim);
-int b3m_set_temperature_limit(B3MData * r, UINT id, int templim);
-
-// set servo id (for use when 1 servo is connected)
-int b3m_get_id(B3MData * r);
-int b3m_set_id(B3MData * r, UINT id);
+int b3m_get_angle(B3MData r[CHANNEL], UINT id[CHANNEL], int deg100[CHANNEL]);
 
 #endif /* B3M_H_ */

@@ -44,7 +44,7 @@ int target_deg100[256];
  *
  * @return 0 if successful, < 0 otherwise
  */
-int b3m_init(B3MData * r, const char* serial_port)
+int b3m_init(B3MData * r, const char* serial_port, int switch_txrx_port)
 {
 	int i;
 	printf("b3m_init\n");
@@ -92,10 +92,9 @@ int b3m_init(B3MData * r, const char* serial_port)
 		exit(-1);
 	}
 	for(i = 0; i < 256; i ++) target_deg100[i] = 100000;
-
-	wiringPiSetup();
-	pinMode(1, OUTPUT);
-	digitalWrite(1, HIGH);
+	r->switch_txrx_port = switch_txrx_port;
+	pinMode(r->switch_txrx_port, OUTPUT);
+	digitalWrite(r->switch_txrx_port, LOW);
 
 	return 0;
 }
@@ -177,7 +176,10 @@ int b3m_read_timeout(B3MData * r, int n, long usecs)
 	    }
 	    bytes_read += i;
 	    gettimeofday(&tv, NULL);
-	} while (bytes_read < n && (tv.tv_sec <= end.tv_sec || tv.tv_usec < end.tv_usec));
+	    if (bytes_read > 0) {
+			if (r->swap[0] != n) break;
+	    }
+	} while (bytes_read < n && (tv.tv_sec < end.tv_sec || (tv.tv_sec == end.tv_sec && tv.tv_usec < end.tv_usec)));
 	return bytes_read;
 }
 
@@ -220,8 +222,15 @@ int b3m_trx_timeout(B3MData * r, UINT bytes_out, UINT bytes_in, long timeout)
 	if ((i = b3m_purge(r)) < 0)
 		return i;
 
-	if ((i = b3m_write(r, bytes_out)) < 0)
+	digitalWrite(r->switch_txrx_port, HIGH);
+	if ((i = b3m_write(r, bytes_out)) < 0) {
+		digitalWrite(r->switch_txrx_port, LOW);
 		return i;
+	}
+
+	if (bytes_out == 7) delayMicroseconds(70);
+	else delayMicroseconds(90);
+	digitalWrite(r->switch_txrx_port, LOW);
 
 	// debug printing
 	if (r->debug) {
@@ -323,12 +332,13 @@ int b3m_get_status(B3MData * r, UINT id, UINT address, UCHAR *data, int byte)
 		return i;
 	}
 
+	if (r->swap[0] != 5 + byte) return -1;
 	for(i = 0; i < byte; i ++){
 		data[i] = r->swap[i + 4];
 	}
 
 	// return error status
-	return r->swap[2];
+	return 0;
 }
 
 
@@ -449,7 +459,7 @@ int b3m_get_angle(B3MData * r, UINT id, int *deg100)
 
 	UCHAR data[2];
 	if (b3m_get_status(r, id, B3M_SERVO_CURRENT_POSITION, data, 2)){
-		b3m_error(r, "get status");
+		return -1;
 	}
 
 	*deg100 = (int)((short)((data[1] << 8) + data[0]));
